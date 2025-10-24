@@ -1,0 +1,28 @@
+body {
+  font-family: 'Pretendard', sans-serif;
+  margin: 0;
+  padding: 0;
+  background: #f6f6f6;
+}
+
+header {
+  background: #222;
+  color: #fff;
+  padding: 15px 30px;
+}
+
+nav a {
+  color: #fff;
+  text-decoration: none;
+  margin-right: 15px;
+}
+
+main {
+  padding: 40px;
+}
+
+footer {
+  text-align: center;
+  background: #eee;
+  padding: 10px;
+}
