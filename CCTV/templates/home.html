@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>AI CCTV Dashboard</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+  <header>
+    <h1>AI CCTV</h1>
+    <a href="{{ url_for('history') }}">
+      <img src="{{ url_for('static', filename='history.png') }}" alt="기록 보기" class="clock-btn">
+    </a>
+  </header>
+
+
+  <div class="video-container">
+    <img src="{{ url_for('video') }}" alt="Live CCTV Feed">
+    <div class="analysis-box" id="analysisBox" aria-live="polite">
+      <h2 id="analysisTitle">분석 대기중</h2>
+      <p id="analysisText">실시간으로 탐지 결과가 여기에 표시됩니다.</p>
+      <div class="confidence">
+        <div id="confBar" class="conf-bar" style="width:0%"></div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    Powered by Gemini · OpenCV · Flask
+  </footer>
+
+  <!-- 로그 팝업 -->
+  <div class="modal" id="logModal" role="dialog" aria-modal="true" aria-labelledby="logTitle">
+    <div class="modal-content">
+      <span class="close" id="closeLogBtn" aria-label="닫기">&times;</span>
+      <h2 id="logTitle">기록</h2>
+      <div id="logList">
+        <!-- JS가 탐지 로그 카드를 prepend 합니다 -->
+      </div>
+    </div>
+  </div>
+
+<script>
+window.onload = () => {
+  const openBtn = document.getElementById('openLogBtn');
+  const closeBtn = document.getElementById('closeLogBtn');
+  const modal = document.getElementById('logModal');
+
+  if (openBtn) {
+    openBtn.onclick = () => modal.style.display = 'flex';
+  }
+  if (closeBtn) {
+    closeBtn.onclick = () => modal.style.display = 'none';
+  }
+  window.onclick = e => { if (e.target === modal) modal.style.display = 'none'; };
+  window.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && modal.style.display === 'flex') modal.style.display = 'none';
+  });
+
+  const analysisTitle = document.getElementById('analysisTitle');
+  const analysisText  = document.getElementById('analysisText');
+  const confBar       = document.getElementById('confBar');
+  const logList       = document.getElementById('logList');
+
+  const es = new EventSource('/events');
+  es.onmessage = (ev) => {
+    const d = JSON.parse(ev.data);
+    const pct = Math.round(d.confidence * 100);
+
+    confBar.style.width = Math.min(100, Math.max(0, pct)) + '%';
+    if (d.label === 'violence') {
+      analysisTitle.textContent = '⚠️ 폭력 감지됨';
+      analysisText.textContent  = `신뢰도 ${pct}%`;
+      analysisTitle.style.color = '#e63946';
+    } else {
+      analysisTitle.textContent = '정상';
+      analysisText.textContent  = `신뢰도 ${pct}%`;
+      analysisTitle.style.color = '#1d1d1f';
+    }
+
+    const item = document.createElement('div');
+    item.className = 'log-item';
+    const time = new Date(d.ts).toLocaleString('ko-KR');
+    item.innerHTML = `
+      <img src="${d.capture_url || '/static/default.jpg'}" alt="장면" style="width:120px;height:90px;object-fit:cover;border-radius:8px;">
+      <div class="log-text">
+        <p class="tag ${d.label === 'violence' ? 'danger' : 'safe'}">${d.label === 'violence' ? '폭행' : '정상'}</p>
+        <p>${d.summary || (d.label === 'violence' ? '두 명의 인물이 신체적 충돌을 하는 장면이 감지되었습니다.' : '이상 징후 없음')}</p>
+        <p class="time">${time}</p>
+        <p class="score">신뢰도 ${pct}%</p>
+      </div>
+    `;
+    logList.prepend(item);
+    if (logList.children.length > 10) logList.removeChild(logList.lastChild);
+  };
+
+  es.onerror = () => console.warn('SSE disconnected (자동 재연결)');
+};
+</script>
+
+</body>
+</html>
