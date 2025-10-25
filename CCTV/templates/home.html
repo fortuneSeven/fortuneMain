@@ -42,14 +42,22 @@
     </div>
   </div>
 
-  <script>
+<script>
+window.onload = () => {
   const openBtn = document.getElementById('openLogBtn');
   const closeBtn = document.getElementById('closeLogBtn');
   const modal = document.getElementById('logModal');
-  openBtn.onclick = () => modal.style.display = 'flex';
-  closeBtn.onclick = () => modal.style.display = 'none';
+
+  if (openBtn) {
+    openBtn.onclick = () => modal.style.display = 'flex';
+  }
+  if (closeBtn) {
+    closeBtn.onclick = () => modal.style.display = 'none';
+  }
   window.onclick = e => { if (e.target === modal) modal.style.display = 'none'; };
-  window.addEventListener('keydown', e => { if (e.key === 'Escape' && modal.style.display==='flex') modal.style.display='none'; });
+  window.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && modal.style.display === 'flex') modal.style.display = 'none';
+  });
 
   const analysisTitle = document.getElementById('analysisTitle');
   const analysisText  = document.getElementById('analysisText');
@@ -89,8 +97,8 @@
   };
 
   es.onerror = () => console.warn('SSE disconnected (자동 재연결)');
+};
 </script>
-
 
 </body>
 </html>
