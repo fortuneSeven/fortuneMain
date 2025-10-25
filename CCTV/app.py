@@ -31,8 +31,8 @@ WEIGHTS_PATH = r"C:\coding\fortuneMain\CCTV\model\new_violence_detection_model.w
 # 카메라/모델 파라미터
 CAM_INDEX   = 0
 IMG_SIZE    = (64, 64)
-SEQ_LEN     = 16
-THRESHOLD   = 0.7
+SEQ_LEN     = 32 # 약 1초
+THRESHOLD   = 0.8
 MIRROR_VIEW = True   # 좌우반전 원하면 True
 
 app = Flask(__name__, static_folder=str(STATIC_DIR))
@@ -74,7 +74,7 @@ def history():
 def events():
     def gen():
         # 재연결 간격(밀리초)
-        yield "retry: 3000\n\n"
+        yield "retry: 30000\n\n"
         while True:
             item = event_q.get()          # block until event
             yield f"data: {json.dumps(item, ensure_ascii=False)}\n\n"
@@ -208,6 +208,7 @@ def detector_loop():
             "capture_url": cap_url,
             "summary": summary_text
         }
+
         try:
             event_q.put_nowait(evt)
         except queue.Full:
@@ -215,6 +216,7 @@ def detector_loop():
             try: event_q.get_nowait()
             except queue.Empty: pass
             event_q.put_nowait(evt)
+        
 
 # 서버 기동 시 탐지 스레드 시작
 if __name__ == "__main__":
