@@ -1,8 +1,8 @@
+from flask import Flask, render_template, Response, render_template_string
 import os, cv2, time, json, threading, queue
 from pathlib import Path
 from datetime import datetime
 import numpy as np
-from flask import Flask, Response, render_template
 
 # ===== TensorFlow / Keras =====
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
@@ -14,61 +14,38 @@ from tensorflow.keras.applications import MobileNetV2
 # ===== 경로/환경 =====
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
-CAPTURE_DIR = STATIC_DIR / "captures"
+CAPTURE_DIR = STATIC_DIR / "captures"           # 캡처 저장 폴더
 CAPTURE_DIR.mkdir(parents=True, exist_ok=True)
 
-# ⚠️ 가중치 파일 경로 수정 필요
+# ⚠️ 가중치 파일 경로를 네 환경에 맞게 수정
 WEIGHTS_PATH = r"/Users/ohuiju/fortuneMain/CCTV/model/new_violence_detection_model.weights.h5"
 
-# 파라미터
+# 카메라/모델 파라미터
 CAM_INDEX   = 0
 IMG_SIZE    = (64, 64)
 SEQ_LEN     = 16
 THRESHOLD   = 0.7
-MIRROR_VIEW = True
+MIRROR_VIEW = True   # 좌우반전 원하면 True
 
-app = Flask(__name__, static_folder=str(STATIC_DIR), template_folder=str(BASE_DIR / "templates"))
+app = Flask(__name__, static_folder=str(STATIC_DIR))
 
-# ===== 이벤트 큐 (SSE) =====
+# ===== 탐지 이벤트 큐 (SSE로 전달) =====
 event_q: "queue.Queue[dict]" = queue.Queue(maxsize=200)
 
-# ===== 전역 카메라/프레임 공유 =====
-camera = cv2.VideoCapture(CAM_INDEX, cv2.CAP_AVFOUNDATION) # 윈도우: camera = cv2.VideoCapture(CAM_INDEX, cv2.CAP_DSHOW)
+# ===== 비디오 스트림 (MJPEG) =====
+camera = cv2.VideoCapture(CAM_INDEX, cv2.CAP_AVFOUNDATION)
 camera.set(cv2.CAP_PROP_FRAME_WIDTH,  640)
 camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-camera.set(cv2.CAP_PROP_CONVERT_RGB, 1)
-# camera.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))  # 필요 시 주석/해제해서 테스트
-
-latest_frame = None
-frame_lock = threading.Lock()
-running = True
-
-def capture_loop():
-    """카메라를 읽는 유일한 스레드: 최신 프레임을 공유 변수에 보관"""
-    global latest_frame
-    # warm-up
-    for _ in range(5):
-        camera.read(); time.sleep(0.02)
-
-    while running:
-        ok, frame = camera.read()
-        if not ok:
-            time.sleep(0.02); continue
-        if MIRROR_VIEW:
-            frame = cv2.flip(frame, 1)
-        with frame_lock:
-            latest_frame = frame
 
 def mjpeg_generator():
-    """공유 프레임을 JPEG로 인코딩해 스트리밍"""
     while True:
-        with frame_lock:
-            frame = None if latest_frame is None else latest_frame.copy()
-        if frame is None:
-            time.sleep(0.02); continue
-        ok, buf = cv2.imencode(".jpg", frame)
+        ok, frame = camera.read()
         if not ok:
-            time.sleep(0.01); continue
+            time.sleep(0.03)
+            continue
+        if MIRROR_VIEW:
+            frame = cv2.flip(frame, 1)
+        _, buf = cv2.imencode(".jpg", frame)
         yield (b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" + buf.tobytes() + b"\r\n")
 
 @app.route("/")
@@ -79,21 +56,23 @@ def home():
 def video():
     return Response(mjpeg_generator(), mimetype="multipart/x-mixed-replace; boundary=frame")
 
-@app.route("/history")
+@app.route("/events")
 def history():
     records = []
     return render_template("history.html", records=records)
 
+# ===== SSE 이벤트 스트림 =====
 @app.route("/events")
 def events():
     def gen():
+        # 재연결 간격(밀리초)
         yield "retry: 3000\n\n"
         while True:
-            item = event_q.get()  # blocking
+            item = event_q.get()          # block until event
             yield f"data: {json.dumps(item, ensure_ascii=False)}\n\n"
     return Response(gen(), mimetype="text/event-stream")
 
-# ===== TF 유틸/모델 =====
+# ===== TensorFlow 유틸/모델 =====
 def set_tf_growth():
     try:
         for gpu in tf.config.list_physical_devices("GPU"):
@@ -102,9 +81,10 @@ def set_tf_growth():
         pass
 
 def build_feature_extractor(img_size=(64,64)):
-    # input_shape=(H,W,3)
-    return MobileNetV2(weights="imagenet", include_top=False, pooling=None,
-                       input_shape=(img_size[1], img_size[0], 3))
+    # input_shape=(H, W, 3)
+    fe = MobileNetV2(weights="imagenet", include_top=False, pooling=None,
+                     input_shape=(img_size[1], img_size[0], 3))
+    return fe
 
 def build_mobilstm(seq_len=16):
     return Sequential([
@@ -118,35 +98,22 @@ def build_mobilstm(seq_len=16):
         Dropout(0.5), Dense(2, activation="softmax"),
     ])
 
+# ===== 백그라운드 탐지 루프 (웹캠→feature→BiLSTM) =====
 def detector_loop():
-    """공유 프레임을 읽어 feature→BiLSTM 분류→SSE 이벤트 발송"""
     set_tf_growth()
     fe = build_feature_extractor(IMG_SIZE)
     model = build_mobilstm(SEQ_LEN)
-
-    # Path 안전 처리
-    path_obj = WEIGHTS_PATH if isinstance(WEIGHTS_PATH, Path) else Path(WEIGHTS_PATH)
-
-    if not path_obj.exists():
-        print(f"[WARN] Weights not found: {path_obj}")
-        print("[WARN] Detector disabled. (Server keeps running)")
-        return
-
-    try:
-        model.load_weights(str(path_obj))  # Path → str 로 전달
-        print(f"[INFO] Weights loaded: {path_obj.name}")
-    except Exception as e:
-        print(f"[ERROR] Failed to load weights: {e}")
-        print("[WARN] Detector disabled. (Server keeps running)")
-        return
+    model.load_weights(WEIGHTS_PATH)
 
     frame_buf = []
 
-    while running:
-        with frame_lock:
-            frame = None if latest_frame is None else latest_frame.copy()
-        if frame is None:
-            time.sleep(0.02); continue
+    while True:
+        ok, frame = camera.read()
+        if not ok:
+            time.sleep(0.03)
+            continue
+        if MIRROR_VIEW:
+            frame = cv2.flip(frame, 1)
 
         # 전처리 → feature (1,2,2,1280)
         resized = cv2.resize(frame, IMG_SIZE)
@@ -158,15 +125,17 @@ def detector_loop():
         frame_buf.append(feat)
         if len(frame_buf) > SEQ_LEN:
             frame_buf.pop(0)
+
         if len(frame_buf) < SEQ_LEN:
             continue
 
         seq = np.expand_dims(np.array(frame_buf, dtype=np.float32), 0)
-        prob = model.predict(seq, verbose=0)[0]  # [safe, violence]
+        prob = model.predict(seq, verbose=0)[0]   # [safe_prob, violence_prob]
         is_violence = int(np.argmax(prob)) == 1
         confidence  = float(prob[1] if is_violence else prob[0])
 
         cap_url = ""
+        # 폭력 + 임계값 초과 시 캡처 저장
         if is_violence and confidence >= THRESHOLD:
             ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
             filename = f"cap_{ts}.jpg"
@@ -174,22 +143,23 @@ def detector_loop():
             cv2.imwrite(str(out_path), frame)
             cap_url = f"/static/captures/{filename}"
 
+        # 이벤트 푸시
         evt = {
             "ts": int(time.time()*1000),
             "label": "violence" if is_violence else "safe",
             "confidence": confidence,
             "capture_url": cap_url,
-            "summary": ""  # LLM 요약 붙일 거면 여기에
+            "summary": ""  # (선택) LLM 요약 붙일 예정이면 여기 채우기
         }
         try:
             event_q.put_nowait(evt)
         except queue.Full:
+            # 큐가 가득 찼으면 가장 오래된 것 버리고 새 것 삽입
             try: event_q.get_nowait()
             except queue.Empty: pass
             event_q.put_nowait(evt)
 
-# ===== 스레드 시작 =====
-threading.Thread(target=capture_loop,  daemon=True).start()
+# 서버 기동 시 탐지 스레드 시작
 threading.Thread(target=detector_loop, daemon=True).start()
 
 if __name__ == "__main__":

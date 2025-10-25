@@ -10,14 +10,15 @@
 
   <header>
     <h1>AI CCTV</h1>
-    <a href="{{ url_for('history') }}">
-      <img
-        src="{{ url_for('static', filename='history.png') }}"
-        alt="기록 보기"
-        class="clock-btn"
-      >
-    </a>
+    <img
+      src="{{ url_for('static', filename='history.png') }}"
+      alt="기록 보기"
+      id="openLogBtn"
+      class="clock-btn"
+      style="cursor: pointer;"
+    >
   </header>
+
 
   <div class="video-container">
     <img src="{{ url_for('video') }}" alt="Live CCTV Feed">
@@ -46,56 +47,54 @@
   </div>
 
   <script>
-    const openBtn = document.getElementById('openLogBtn');
-    const closeBtn = document.getElementById('closeLogBtn');
-    const modal = document.getElementById('logModal');
+  const openBtn = document.getElementById('openLogBtn');
+  const closeBtn = document.getElementById('closeLogBtn');
+  const modal = document.getElementById('logModal');
+  openBtn.onclick = () => modal.style.display = 'flex';
+  closeBtn.onclick = () => modal.style.display = 'none';
+  window.onclick = e => { if (e.target === modal) modal.style.display = 'none'; };
+  window.addEventListener('keydown', e => { if (e.key === 'Escape' && modal.style.display==='flex') modal.style.display='none'; });
 
-    openBtn.onclick = () => modal.style.display = 'flex';
-    closeBtn.onclick = () => modal.style.display = 'none';
-    window.onclick = e => { if (e.target === modal) modal.style.display = 'none'; };
-    window.addEventListener('keydown', e => { if (e.key === 'Escape' && modal.style.display==='flex') modal.style.display='none'; });
+  const analysisTitle = document.getElementById('analysisTitle');
+  const analysisText  = document.getElementById('analysisText');
+  const confBar       = document.getElementById('confBar');
+  const logList       = document.getElementById('logList');
 
-    // 분석 박스 요소
-    const analysisTitle = document.getElementById('analysisTitle');
-    const analysisText  = document.getElementById('analysisText');
-    const confBar       = document.getElementById('confBar');
-    const logList       = document.getElementById('logList');
+  const es = new EventSource('/events');
+  es.onmessage = (ev) => {
+    const d = JSON.parse(ev.data);
+    const pct = Math.round(d.confidence * 100);
 
-    // SSE 연결
-    const es = new EventSource('/events');
-    es.onmessage = (ev) => {
-      const d = JSON.parse(ev.data); // {ts,label,confidence,capture_url,summary}
+    confBar.style.width = Math.min(100, Math.max(0, pct)) + '%';
+    if (d.label === 'violence') {
+      analysisTitle.textContent = '⚠️ 폭력 감지됨';
+      analysisText.textContent  = `신뢰도 ${pct}%`;
+      analysisTitle.style.color = '#e63946';
+    } else {
+      analysisTitle.textContent = '정상';
+      analysisText.textContent  = `신뢰도 ${pct}%`;
+      analysisTitle.style.color = '#1d1d1f';
+    }
 
-      // 분석 박스 갱신
-      const pct = Math.round(d.confidence * 100);
-      confBar.style.width = Math.min(100, Math.max(0, pct)) + '%';
+    const item = document.createElement('div');
+    item.className = 'log-item';
+    const time = new Date(d.ts).toLocaleString('ko-KR');
+    item.innerHTML = `
+      <img src="${d.capture_url || '/static/default.jpg'}" alt="장면" style="width:120px;height:90px;object-fit:cover;border-radius:8px;">
+      <div class="log-text">
+        <p class="tag ${d.label === 'violence' ? 'danger' : 'safe'}">${d.label === 'violence' ? '폭행' : '정상'}</p>
+        <p>${d.summary || (d.label === 'violence' ? '두 명의 인물이 신체적 충돌을 하는 장면이 감지되었습니다.' : '이상 징후 없음')}</p>
+        <p class="time">${time}</p>
+        <p class="score">신뢰도 ${pct}%</p>
+      </div>
+    `;
+    logList.prepend(item);
+    if (logList.children.length > 10) logList.removeChild(logList.lastChild);
+  };
 
-      if (d.label === 'violence') {
-        analysisTitle.textContent = '폭력 감지됨';
-        analysisText.textContent  = `신뢰도 ${pct}%`;
-        analysisTitle.style.color = '#e63946';
-      } else {
-        analysisTitle.textContent = '정상';
-        analysisText.textContent  = `신뢰도 ${pct}%`;
-        analysisTitle.style.color = '#1d1d1f';
-      }
+  es.onerror = () => console.warn('SSE disconnected (자동 재연결)');
+</script>
 
-      // 모달 로그 아이템 추가
-      const item = document.createElement('div');
-      item.className = 'log-item';
-      item.innerHTML = `
-        ${d.capture_url ? `<img src="${d.capture_url}" alt="폭력 장면">` : `<div class="img-ph"><span>—</span></div>`}
-        <div class="log-text">
-          <p class="tag">${d.label === 'violence' ? '폭행' : '정상'}</p>
-          <p>${d.summary || (d.label === 'violence' ? '폭력 의심 장면이 탐지되었습니다.' : '이상 없음')}</p>
-          <p class="time">${new Date(d.ts).toLocaleString()}</p>
-          <p class="score">신뢰도 ${pct}%</p>
-        </div>
-      `;
-      logList.prepend(item);
-    };
-    es.onerror = () => console.warn('SSE disconnected (auto-retry)');
-  </script>
 
 </body>
 </html>
