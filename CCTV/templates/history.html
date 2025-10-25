@@ -53,6 +53,7 @@
 
       // 최신 로그를 위쪽에 추가
       logContainer.prepend(card);
+      logContainer.scrollTop = 0;
     };
 
     es.onerror = () => {
