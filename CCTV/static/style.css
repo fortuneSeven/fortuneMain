@@ -86,7 +86,8 @@ footer {
 .clock-btn {
   background: transparent;
   border: none;
-  font-size: 20px;
+  width: 30px;
+  height: 30px;
   cursor: pointer;
   transition: transform 0.2s ease;
 }
@@ -181,14 +182,4 @@ footer {
   width: 120px; height: 90px;
   border-radius: 8px; background: #e9ecef;
   display:flex; align-items:center; justify-content:center; color:#999; font-size:12px;
-}
-
-.clock-btn {
-  background: transparent;
-  border: none;
-  width: 30px;
-  height: 30px;
-  object-fit: contain; 
-  cursor: pointer;
-  transition: transform 0.2s ease;
 }
