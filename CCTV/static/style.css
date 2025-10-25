@@ -1,28 +1,160 @@
-body {
-  font-family: 'Pretendard', sans-serif;
+@import url('https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@400;500;600&display=swap');
+
+* {
   margin: 0;
   padding: 0;
-  background: #f6f6f6;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
+  background-color: #f5f5f7;
+  color: #1d1d1f;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
 }
 
 header {
-  background: #222;
-  color: #fff;
-  padding: 15px 30px;
+  position: fixed;
+  top: 0;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(20px);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  padding: 14px 32px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
-nav a {
-  color: #fff;
-  text-decoration: none;
-  margin-right: 15px;
+header h1 {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
 }
 
-main {
-  padding: 40px;
+.video-container {
+  position: relative;
+  width: 80%;
+  max-width: 900px;
+  margin-top: 90px;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+}
+
+.video-container img {
+  width: 100%;
+  height: auto;
+  display: block;
 }
 
 footer {
-  text-align: center;
-  background: #eee;
-  padding: 10px;
+  margin-top: 20px;
+  font-size: 13px;
+  color: #6e6e73;
+}
+
+.analysis-box {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  padding: 16px 20px;
+  max-width: 320px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+.analysis-box h2 {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #e63946;
+}
+
+.analysis-box p {
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* 오른쪽 상단 시계 버튼 */
+.clock-btn {
+  background: transparent;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.clock-btn:hover {
+  transform: scale(1.1);
+}
+
+/* 팝업 (modal) */
+.modal {
+  display: none;
+  position: fixed;
+  top: 0; left: 0;
+  width: 100vw; height: 100vh;
+  background: rgba(0,0,0,0.3);
+  backdrop-filter: blur(5px);
+  justify-content: center;
+  align-items: center;
+  z-index: 100;
+}
+
+.modal-content {
+  background: rgba(255,255,255,0.8);
+  backdrop-filter: blur(15px);
+  border-radius: 16px;
+  padding: 30px;
+  width: 420px;
+  box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+  position: relative;
+}
+
+.close {
+  position: absolute;
+  top: 15px;
+  right: 20px;
+  font-size: 24px;
+  cursor: pointer;
+  color: #666;
+}
+
+.modal-content h2 {
+  margin-bottom: 20px;
+  font-weight: 600;
+  font-size: 18px;
+  color: #1d1d1f;
+}
+
+.log-item {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.log-item img {
+  width: 120px;
+  height: 90px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.log-text .tag {
+  color: #e63946;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.log-text .time {
+  font-size: 13px;
+  color: #6e6e73;
+  margin-top: 8px;
 }

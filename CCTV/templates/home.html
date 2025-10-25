@@ -2,19 +2,54 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <title>{{ title }}CCTV</title>
+  <title>AI CCTV Dashboard</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
+
   <header>
-    <h1>CCTV</h1>
+    <h1>AI CCTV</h1>
+    <button class="clock-btn" id="openLogBtn">🕓</button>
   </header>
 
-  <img src="{{ url_for('video') }}" style="width:100vw; height:100vh; object-fit:cover;">
+  <div class="video-container">
+    <img src="{{ url_for('video') }}" alt="Live CCTV Feed">
+    <div class="analysis-box">
+      <h2>폭력 감지됨</h2>
+      <p>이 상황은 한 인물이 다른 인물을 공격하는 것으로 보입니다.<br>
+         두 명의 학생으로 추정됩니다.</p>
+    </div>
+  </div>
 
-  <main>
-    {% block content %}{% endblock %}
-  </main>
+  <footer>
+    Powered by Gemini · OpenCV · Flask
+  </footer>
+
+  <!-- ✅ 로그 팝업 -->
+  <div class="modal" id="logModal">
+    <div class="modal-content">
+      <span class="close" id="closeLogBtn">&times;</span>
+      <h2>기록</h2>
+      <div class="log-item">
+        <img src="{{ url_for('static', filename='capture.jpg') }}" alt="폭력 장면">
+        <div class="log-text">
+          <p class="tag">폭행</p>
+          <p>이 상황은 비는 아이가 있고 때리는 아이가 있다.<br>학생 둘, 고등학생으로 추정됨.</p>
+          <p class="time">2025-09-08 (토) 15:15:27</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const openBtn = document.getElementById('openLogBtn');
+    const closeBtn = document.getElementById('closeLogBtn');
+    const modal = document.getElementById('logModal');
+
+    openBtn.onclick = () => modal.style.display = 'flex';
+    closeBtn.onclick = () => modal.style.display = 'none';
+    window.onclick = e => { if (e.target === modal) modal.style.display = 'none'; };
+  </script>
 
 </body>
 </html>
