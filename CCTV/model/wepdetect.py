@@ -137,6 +137,7 @@ def main():
     try:
         while True:
             ok, frame = cap.read()
+            frame = cv2.flip(frame, 1)
             if not ok:
                 print("⚠️ 프레임을 읽을 수 없습니다.")
                 break
