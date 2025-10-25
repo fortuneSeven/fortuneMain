@@ -1,2 +1,9 @@
 .DS_Store
-.DS_Store
+venv/
+.venv/
+__pycache__/
+*.dylib
+*.so
+*.mp4
+*.h5
+static/captures/

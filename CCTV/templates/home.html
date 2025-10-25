@@ -10,11 +10,13 @@
 
   <header>
     <h1>AI CCTV</h1>
-    <img
-      src="{{ url_for( 'static', filename='history.png') }}"
-      id="openLogbtn"
-      class="clock-btn"
-    >
+    <a href="{{ url_for('history') }}">
+      <img
+        src="{{ url_for('static', filename='history.png') }}"
+        alt="기록 보기"
+        class="clock-btn"
+      >
+    </a>
   </header>
 
   <div class="video-container">
@@ -32,7 +34,7 @@
     Powered by Gemini · OpenCV · Flask
   </footer>
 
-  <!-- ✅ 로그 팝업 -->
+  <!-- 로그 팝업 -->
   <div class="modal" id="logModal" role="dialog" aria-modal="true" aria-labelledby="logTitle">
     <div class="modal-content">
       <span class="close" id="closeLogBtn" aria-label="닫기">&times;</span>

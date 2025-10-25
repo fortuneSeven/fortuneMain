@@ -1,4 +1,3 @@
-# app.py
 import os, cv2, time, json, threading, queue
 from pathlib import Path
 from datetime import datetime
@@ -19,7 +18,7 @@ CAPTURE_DIR = STATIC_DIR / "captures"
 CAPTURE_DIR.mkdir(parents=True, exist_ok=True)
 
 # ⚠️ 가중치 파일 경로 수정 필요
-WEIGHTS_PATH = r"C:\coding\fortuneseven\fortuneMain-1\CCTV\model\new_violence_detection_model.weights.h5"
+WEIGHTS_PATH = r"/Users/ohuiju/fortuneMain/CCTV/model/new_violence_detection_model.weights.h5"
 
 # 파라미터
 CAM_INDEX   = 0
@@ -34,11 +33,11 @@ app = Flask(__name__, static_folder=str(STATIC_DIR), template_folder=str(BASE_DI
 event_q: "queue.Queue[dict]" = queue.Queue(maxsize=200)
 
 # ===== 전역 카메라/프레임 공유 =====
-camera = cv2.VideoCapture(CAM_INDEX, cv2.CAP_DSHOW)
+camera = cv2.VideoCapture(CAM_INDEX, cv2.CAP_AVFOUNDATION) # 윈도우: camera = cv2.VideoCapture(CAM_INDEX, cv2.CAP_DSHOW)
 camera.set(cv2.CAP_PROP_FRAME_WIDTH,  640)
 camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
 camera.set(cv2.CAP_PROP_CONVERT_RGB, 1)
-camera.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))  # 필요 시 주석/해제해서 테스트
+# camera.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))  # 필요 시 주석/해제해서 테스트
 
 latest_frame = None
 frame_lock = threading.Lock()
@@ -80,6 +79,11 @@ def home():
 def video():
     return Response(mjpeg_generator(), mimetype="multipart/x-mixed-replace; boundary=frame")
 
+@app.route("/history")
+def history():
+    records = []
+    return render_template("history.html", records=records)
+
 @app.route("/events")
 def events():
     def gen():
@@ -119,7 +123,22 @@ def detector_loop():
     set_tf_growth()
     fe = build_feature_extractor(IMG_SIZE)
     model = build_mobilstm(SEQ_LEN)
-    model.load_weights(WEIGHTS_PATH)
+
+    # Path 안전 처리
+    path_obj = WEIGHTS_PATH if isinstance(WEIGHTS_PATH, Path) else Path(WEIGHTS_PATH)
+
+    if not path_obj.exists():
+        print(f"[WARN] Weights not found: {path_obj}")
+        print("[WARN] Detector disabled. (Server keeps running)")
+        return
+
+    try:
+        model.load_weights(str(path_obj))  # Path → str 로 전달
+        print(f"[INFO] Weights loaded: {path_obj.name}")
+    except Exception as e:
+        print(f"[ERROR] Failed to load weights: {e}")
+        print("[WARN] Detector disabled. (Server keeps running)")
+        return
 
     frame_buf = []
 
