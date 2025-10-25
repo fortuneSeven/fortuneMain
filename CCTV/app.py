@@ -3,7 +3,7 @@ import cv2
 
 app = Flask(__name__)
 
-camera = cv2.VideoCapture(0) # 윈도우에서는 camera = cv2.VideoCapture(0) 
+camera = cv2.VideoCapture(0, cv2.CAP_AVFOUNDATION) # 윈도우에서는 camera = cv2.VideoCapture(0) 맥: camera = cv2.VideoCapture(0, cv2.CAP_AVFOUNDATION)
 
 camera.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
 camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
