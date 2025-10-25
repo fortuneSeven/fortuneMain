@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>AI CCTV 기록</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+  <!-- 헤더 -->
+  <header class="top-header">
+    <h1>AI CCTV 기록</h1>
+    <a href="/" class="back-btn">←</a>
+  </header>
+
+  <!-- 메인 -->
+  <main class="log-page">
+    <h2>탐지 결과 기록</h2>
+    <div id="logContainer" class="log-container">
+      <p id="noData" class="no-data">아직 감지된 기록이 없습니다.</p>
+    </div>
+  </main>
+
+  <footer>
+    Powered by Gemini · OpenCV · Flask
+  </footer>
+
+  <script>
+    const logContainer = document.getElementById("logContainer");
+    const noData = document.getElementById("noData");
+
+    // SSE 연결
+    const es = new EventSource("/events");
+    es.onmessage = (ev) => {
+      const d = JSON.parse(ev.data);  // { ts, label, confidence, capture_url, summary }
+
+      // “기록 없음” 문구 숨기기
+      if (noData) noData.style.display = "none";
+
+      // 새로운 로그 카드 생성
+      const card = document.createElement("div");
+      card.className = "log-item";
+      card.innerHTML = `
+        ${d.capture_url ? `<img src="${d.capture_url}" alt="장면 이미지">` : `<div class="img-ph"><span>—</span></div>`}
+        <div class="log-text">
+          <p class="tag">${d.label === "violence" ? "폭력 감지" : "정상"}</p>
+          <p>${d.summary || (d.label === "violence" ? "폭력 의심 장면이 탐지되었습니다." : "이상 없음")}</p>
+          <p class="time">${new Date(d.ts).toLocaleString()}</p>
+          <p class="score">신뢰도 ${Math.round(d.confidence * 100)}%</p>
+        </div>
+      `;
+
+      // 최신 로그를 위쪽에 추가
+      logContainer.prepend(card);
+      logContainer.scrollTop = 0;
+    };
+
+    es.onerror = () => {
+      console.warn("⚠️ SSE 연결 끊김 (자동 재시도 중)");
+    };
+  </script>
+</body>
+</html>

@@ -3,6 +3,14 @@ import os, cv2, time, json, threading, queue
 from pathlib import Path
 from datetime import datetime
 import numpy as np
+from dotenv import load_dotenv
+from openai import OpenAI
+import base64, mimetypes, io
+from PIL import Image
+
+# 환경 변수
+load_dotenv()
+HF_API_KEY = os.getenv("HUGGINGFACE_API_KEY")
 
 # ===== TensorFlow / Keras =====
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
@@ -56,7 +64,7 @@ def home():
 def video():
     return Response(mjpeg_generator(), mimetype="multipart/x-mixed-replace; boundary=frame")
 
-@app.route("/events")
+@app.route("/history")
 def history():
     records = []
     return render_template("history.html", records=records)
@@ -98,6 +106,51 @@ def build_mobilstm(seq_len=16):
         Dropout(0.5), Dense(2, activation="softmax"),
     ])
 
+# LLM
+client = OpenAI(
+    base_url="https://router.huggingface.co/v1",
+    api_key=HF_API_KEY,
+)
+
+def encode_image_to_base64(image_path, max_size=(1024, 1024)):
+    mime_type, _ = mimetypes.guess_type(image_path)
+    if not mime_type or not mime_type.startswith("image"):
+        raise ValueError(f"유효하지 않은 이미지 파일: {image_path}")
+    with Image.open(image_path) as img:
+        img.thumbnail(max_size)
+        buffer = io.BytesIO()
+        if img.mode in ('RGBA', 'P'):
+            img = img.convert('RGB')
+        img.save(buffer, format="JPEG")
+        encoded = base64.b64encode(buffer.getvalue()).decode("utf-8")
+    return f"data:image/jpeg;base64,{encoded}"
+
+def summarize_one_image(image_path):
+    prompt = (
+        "이 CCTV 장면은 폭력 사건의 일부입니다.\n"
+        "등장인물의 공격적/방어적 행동과 물리적 충돌의 방향을 관찰하고,\n"
+        "한 문장으로 행동 중심으로 요약하세요. 감정적 표현은 배제하세요."
+    )
+    base64_image = encode_image_to_base64(image_path)
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": prompt},
+                {"type": "image_url", "image_url": {"url": base64_image}}
+            ]
+        }
+    ]
+    try:
+        completion = client.chat.completions.create(
+            model="Qwen/Qwen2.5-VL-7B-Instruct:hyperbolic",
+            messages=messages,
+        )
+        return completion.choices[0].message.content
+    except Exception as e:
+        print("❌ 요약 오류:", e)
+        return "(요약 실패)"
+
 # ===== 백그라운드 탐지 루프 (웹캠→feature→BiLSTM) =====
 def detector_loop():
     set_tf_growth()
@@ -135,6 +188,7 @@ def detector_loop():
         confidence  = float(prob[1] if is_violence else prob[0])
 
         cap_url = ""
+        summary_text = ""
         # 폭력 + 임계값 초과 시 캡처 저장
         if is_violence and confidence >= THRESHOLD:
             ts = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
@@ -143,13 +197,16 @@ def detector_loop():
             cv2.imwrite(str(out_path), frame)
             cap_url = f"/static/captures/{filename}"
 
+            # LLM 요약 호출
+            summary_text = summarize_one_image(str(out_path))
+
         # 이벤트 푸시
         evt = {
             "ts": int(time.time()*1000),
             "label": "violence" if is_violence else "safe",
             "confidence": confidence,
             "capture_url": cap_url,
-            "summary": ""  # (선택) LLM 요약 붙일 예정이면 여기 채우기
+            "summary": summary_text
         }
         try:
             event_q.put_nowait(evt)

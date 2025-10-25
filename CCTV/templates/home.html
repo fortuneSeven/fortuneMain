@@ -10,13 +10,9 @@
 
   <header>
     <h1>AI CCTV</h1>
-    <img
-      src="{{ url_for('static', filename='history.png') }}"
-      alt="기록 보기"
-      id="openLogBtn"
-      class="clock-btn"
-      style="cursor: pointer;"
-    >
+    <a href="{{ url_for('history') }}">
+      <img src="{{ url_for('static', filename='history.png') }}" alt="기록 보기" class="clock-btn">
+    </a>
   </header>
 
 
