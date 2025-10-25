@@ -18,7 +18,7 @@ CAPTURE_DIR = STATIC_DIR / "captures"           # 캡처 저장 폴더
 CAPTURE_DIR.mkdir(parents=True, exist_ok=True)
 
 # ⚠️ 가중치 파일 경로를 네 환경에 맞게 수정
-WEIGHTS_PATH = r"/Users/ohuiju/fortuneMain/CCTV/model/new_violence_detection_model.weights.h5"
+WEIGHTS_PATH = r"C:\coding\fortuneMain\CCTV\model\new_violence_detection_model.weights.h5"
 
 # 카메라/모델 파라미터
 CAM_INDEX   = 0
@@ -33,7 +33,7 @@ app = Flask(__name__, static_folder=str(STATIC_DIR))
 event_q: "queue.Queue[dict]" = queue.Queue(maxsize=200)
 
 # ===== 비디오 스트림 (MJPEG) =====
-camera = cv2.VideoCapture(CAM_INDEX, cv2.CAP_AVFOUNDATION)
+camera = cv2.VideoCapture(CAM_INDEX, cv2.CAP_DSHOW)
 camera.set(cv2.CAP_PROP_FRAME_WIDTH,  640)
 camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
 
@@ -160,7 +160,8 @@ def detector_loop():
             event_q.put_nowait(evt)
 
 # 서버 기동 시 탐지 스레드 시작
-threading.Thread(target=detector_loop, daemon=True).start()
-
 if __name__ == "__main__":
-    app.run(debug=True, threaded=True)
+    # 스레드 시작
+    threading.Thread(target=detector_loop, daemon=True).start()
+    # 재로더 끄고 실행
+    app.run(debug=True, threaded=True, use_reloader=False)
